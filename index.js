@@ -80,6 +80,10 @@ axios(URL)
 
 
 
+/*------------------------------------
+/   スプレッドシートの情報取得
+------------------------------------*/
+
 // Google 公式の npm googleapis
 // https://www.npmjs.com/package/googleapis
 let {google} = require('googleapis');
@@ -144,6 +148,14 @@ async function getSheetRequest(){
  
 // スプレッドシートを読み込む
 getSheetRequest();
+
+
+
+
+
+/*------------------------------------
+/   スプレッドシートのインサート
+------------------------------------*/
 
 
 
