@@ -119,6 +119,7 @@ async function insertSheetRequest() {
             resource: {
                 values: [
                     ["a", "b", "c"],
+                    ["d", "e", "f"]
                 ],
             },
 
