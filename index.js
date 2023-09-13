@@ -11,27 +11,53 @@ require('dotenv').config();
 ------------------------------------*/
 //WEBスクレイパーを作成
 
-// async function scraping() {
-const URL = "https://search.rakuten.co.jp/search/mall/メガネ";    //スクレイピングしたいページ(今回は楽天のメガネを検索したページ)
 const data = [];
 
-axios(URL)
-    .then((res) => {
-        const htmlParser = res.data; //リクエストしたUTLのHTMLが格納される
-        // console.log(htmlParser);
+// async function getScraping() {
 
-        const $ = cheerio.load(htmlParser); // cheerioの慣例で$に代入する
+//     const URL = "https://search.rakuten.co.jp/search/mall/メガネ";    //スクレイピングしたいページ(今回は楽天のメガネを検索したページ)
 
-        $(".searchresultitem", htmlParser).each(function () {   //スクレイピング先ページのパターンを見つけて、セレクターを指定して、取得した結果をdata配列に格納する
+
+//     axios(URL)
+//     .then((res) => {
+//         const htmlParser = res.data; //リクエストしたUTLのHTMLが格納される
+//         // console.log(htmlParser);
+
+//         const $ = cheerio.load(htmlParser); // cheerioの慣例で$に代入する
+
+//         $(".searchresultitem", htmlParser).each(function () {   //スクレイピング先ページのパターンを見つけて、セレクターを指定して、取得した結果をdata配列に格納する
+//             const title = $(this).find("h2").text();
+//             const price = $(this).find(".price--OX_YW").text();
+//             data.push({ title, price });
+//         })
+//         return data;
+//         // console.log(data);
+//     })
+//     .catch(error => console.log("スクレイピングのエラーだよ", error));
+// }
+
+
+
+async function getScraping() {
+    const URL = "https://search.rakuten.co.jp/search/mall/メガネ";
+    try {
+        const res = await axios(URL);
+        const htmlParser = res.data;
+        const $ = cheerio.load(htmlParser);
+        const scrapedData = [];
+
+        $(".searchresultitem", htmlParser).each(function () {
             const title = $(this).find("h2").text();
             const price = $(this).find(".price--OX_YW").text();
-            data.push({ title, price });
-        })
-        // console.log(data);
-    })
-    .catch(error => console.log(error));
-// };
+            scrapedData.push({ title, price });
+        });
 
+        return scrapedData; // スクレイピング結果を返す
+    } catch (error) {
+        console.log("スクレイピングのエラーだよ", error);
+        throw error;
+    }
+}
 
 
 /*------------------------------------
@@ -80,7 +106,7 @@ async function getSheetRequest() {
             spreadsheetId: sheet,
             range: cells
         });
-        console.log(responseGetSheet.data.values);
+        // console.log(responseGetSheet.data.values); // Sheetの情報をconsoleに表示
     } catch (error) {
         console.log('The API returned an error: ' + error);
     }
@@ -93,41 +119,43 @@ getSheetRequest();
 /   スプレッドシートのインサート
 参考サイト：https://qiita.com/castaneai/items/a53d0b89bca5b84654be
 ------------------------------------*/
-
-
 async function insertSheetRequest() {
 
-    // スプレッドシートのセルの指定
-    let cells = 'A1';
-    // JSON Web Token(JWT) の認証
-    let resultJwtClient;
     try {
-        resultJwtClient = await jwtClient.authorize();
-        // console.log(resultJwtClient);
+        const scrapedData = await getScraping(); // awaitで、getScrapingの完了を待つ
+        console.log(scrapedData[0].title, scrapedData[0].price); // スクレイプしたデータをログに出力できます
+    
+        // スプレッドシートのセルの指定
+        let cells = 'A1';
+        // JSON Web Token(JWT) の認証
+        let resultJwtClient;
+        try {
+            resultJwtClient = await jwtClient.authorize();
+            // console.log(resultJwtClient);
+        } catch (error) {
+            console.log("Auth Error: " + error);
+        }
+        // シートのインサート
+        try {
+            responseGetSheet = await sheets.spreadsheets.values.append({
+                auth: jwtClient,
+                spreadsheetId: sheet,
+                range: cells,
+                valueInputOption: 'USER_ENTERED',
+                insertDataOption: 'INSERT_ROWS',
+                resource: {
+                    values: [
+                        ["1", scrapedData[0].title, scrapedData[0].price]
+                    ],
+                },
+            });
+            console.log("insert 成功");
+            
+        } catch (error) {
+            console.log('The API returned an error: ' + error, "失敗");
+        }
     } catch (error) {
-        console.log("Auth Error: " + error);
-    }
-
-    // シートのインサート
-    try {
-        responseGetSheet = await sheets.spreadsheets.values.append({
-            auth: jwtClient,
-            spreadsheetId: sheet,
-            range: cells,
-            valueInputOption: 'USER_ENTERED',
-            insertDataOption: 'INSERT_ROWS',
-            resource: {
-                values: [
-                    ["a", "b", "c"],
-                    ["d", "e", "f"]
-                ],
-            },
-
-        });
-        console.log("insert 成功");
-        
-    } catch (error) {
-        console.log('The API returned an error: ' + error, "失敗");
+        console.log('スクレイピンエラー:', error);
     }
 }
 
@@ -145,3 +173,4 @@ app.get("/", async (req, res) => {
     // メインの処理を呼び出す
     res.send(data);
 });
+
