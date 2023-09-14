@@ -11,32 +11,7 @@ require('dotenv').config();
 ------------------------------------*/
 //WEBスクレイパーを作成
 
-const data = [];
-
-// async function getScraping() {
-
-//     const URL = "https://search.rakuten.co.jp/search/mall/メガネ";    //スクレイピングしたいページ(今回は楽天のメガネを検索したページ)
-
-
-//     axios(URL)
-//     .then((res) => {
-//         const htmlParser = res.data; //リクエストしたUTLのHTMLが格納される
-//         // console.log(htmlParser);
-
-//         const $ = cheerio.load(htmlParser); // cheerioの慣例で$に代入する
-
-//         $(".searchresultitem", htmlParser).each(function () {   //スクレイピング先ページのパターンを見つけて、セレクターを指定して、取得した結果をdata配列に格納する
-//             const title = $(this).find("h2").text();
-//             const price = $(this).find(".price--OX_YW").text();
-//             data.push({ title, price });
-//         })
-//         return data;
-//         // console.log(data);
-//     })
-//     .catch(error => console.log("スクレイピングのエラーだよ", error));
-// }
-
-
+const scrapedData = [];
 
 async function getScraping() {
     const URL = "https://search.rakuten.co.jp/search/mall/メガネ";
@@ -44,7 +19,6 @@ async function getScraping() {
         const res = await axios(URL);
         const htmlParser = res.data;
         const $ = cheerio.load(htmlParser);
-        const scrapedData = [];
 
         $(".searchresultitem", htmlParser).each(function () {
             const title = $(this).find("h2").text();
@@ -115,6 +89,10 @@ async function getSheetRequest() {
 // スプレッドシートを読み込む
 getSheetRequest();
 
+
+
+
+
 /*------------------------------------
 /   スプレッドシートのインサート
 参考サイト：https://qiita.com/castaneai/items/a53d0b89bca5b84654be
@@ -122,11 +100,11 @@ getSheetRequest();
 async function insertSheetRequest() {
 
     try {
-        const scrapedData = await getScraping(); // awaitで、getScrapingの完了を待つ
-        console.log(scrapedData[0].title, scrapedData[0].price); // スクレイプしたデータをログに出力できます
-    
-        // スプレッドシートのセルの指定
-        let cells = 'A1';
+        await getScraping(); // awaitで、getScrapingの完了を待つ
+        console.log("スクレイプ完了 スクレイプ数：" +scrapedData.length);
+        console.log();
+        // console.log(scrapedData[0].title, scrapedData[0].price); // スクレイプしたデータをログに出力も可能
+
         // JSON Web Token(JWT) の認証
         let resultJwtClient;
         try {
@@ -135,27 +113,32 @@ async function insertSheetRequest() {
         } catch (error) {
             console.log("Auth Error: " + error);
         }
+        
         // シートのインサート
-        try {
-            responseGetSheet = await sheets.spreadsheets.values.append({
-                auth: jwtClient,
-                spreadsheetId: sheet,
-                range: cells,
-                valueInputOption: 'USER_ENTERED',
-                insertDataOption: 'INSERT_ROWS',
-                resource: {
-                    values: [
-                        ["1", scrapedData[0].title, scrapedData[0].price]
-                    ],
-                },
-            });
-            console.log("insert 成功");
-            
-        } catch (error) {
-            console.log('The API returned an error: ' + error, "失敗");
-        }
+        for (let i = 0; i < scrapedData.length; i++) {
+            const rowData = [
+                i + 1, // 行番号
+                scrapedData[i].title, // タイトル
+                scrapedData[i].price, // 価格
+            ];
+            try {
+                await sheets.spreadsheets.values.append({
+                    auth: jwtClient,
+                    spreadsheetId: sheet,
+                    range: 'A1',// スプレッドシートの書き込み開始セルの指定
+                    valueInputOption: 'USER_ENTERED',
+                    insertDataOption: 'INSERT_ROWS',    //USER_ENTEREDとINSERT_ROWSでシート内の一番最後の空白行にインサートができる
+                    resource: {
+                        values: [rowData],
+                    },
+                });
+            } catch (error) {
+                console.log('Row ' + (i) + ' のインサートにエラーが発生しました: ' + error);
+            }
+        }    
+        console.log( scrapedData.length + '行のインサート成功');                       
     } catch (error) {
-        console.log('スクレイピンエラー:', error);
+        console.log('インサート失敗:', error);
     }
 }
 
@@ -171,6 +154,6 @@ app.listen(PORT, console.log("Serverが起動しました"));
 
 app.get("/", async (req, res) => {
     // メインの処理を呼び出す
-    res.send(data);
+    res.send(scrapedData);
 });
 
